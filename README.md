@@ -80,21 +80,21 @@ Your terminal will display your active connection endpoints:
 
 ```mermaid
 flowchart TD
-    subgraph LAN / Network
+    subgraph LAN_Network ["LAN / Local Network"]
         Host["🖥️ Host (Device A)"]
         Server["⚡ DropCode Server"]
         Peer1["📱 Peer 1 (Device B)"]
         Peer2["💻 Peer 2 (Device C)"]
     end
 
-    Host <-->|1. Create Room & Signaling| Server
-    Peer1 <-->|2. Join with 6-char Code| Server
-    Peer2 <-->|2. Join with 6-char Code| Server
+    Host <-->|"1. Create Room & Signaling"| Server
+    Peer1 <-->|"2. Join with 6-char Code"| Server
+    Peer2 <-->|"2. Join with 6-char Code"| Server
 
-    Host <-.->|Direct WebRTC P2P DataChannel (Fastest)| Peer1
-    Host <-.->|Direct WebRTC P2P DataChannel (Fastest)| Peer2
-    Host <===>|Socket.IO Relay (Automatic Fallback)| Server
-    Server <===>|Relay Stream| Peer1
+    Host -.->|"Direct WebRTC P2P (Fastest)"| Peer1
+    Host -.->|"Direct WebRTC P2P (Fastest)"| Peer2
+    Host <==>|"Socket.IO Relay (Fallback)"| Server
+    Server <==>|"Relay Stream"| Peer1
 ```
 
 1. **Host a Session**:
