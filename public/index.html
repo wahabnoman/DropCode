@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DropCode // Transfer Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <header class="hud-header">
+      <div class="hud-topline">// SYS.DROPCODE /// LOCAL-TRANSFER-NODE /// REV 3.0</div>
+      <h1>DROPCODE<span class="cursor">_</span></h1>
+      <p class="tagline">[ PAIR WITH A CODE ] [ TRANSMIT FILES // FOLDERS // TEXT ] [ DIRECT OR RELAYED ]</p>
+    </header>
+
+    <!-- STEP 1: choose role -->
+    <section id="setup" class="panel crt-frame">
+      <div class="hud-label">[ 01 // IDENTITY ]</div>
+      <div class="name-row">
+        <label for="myNameInput">Your device name</label>
+        <input id="myNameInput" maxlength="40" placeholder="e.g. ALEX'S LAPTOP" autocomplete="off" />
+      </div>
+
+      <div class="hud-label">[ 02 // ESTABLISH LINK ]</div>
+      <div class="role-grid">
+        <div class="role-card">
+          <div class="role-tag">A</div>
+          <h2>Host</h2>
+          <p>Generate a code for someone to connect to you.</p>
+          <button id="hostBtn" class="primary">&gt; Start Sharing</button>
+          <label class="checkbox-row">
+            <input type="checkbox" id="hostForceRelay" checked />
+            <span>Always relay through this server</span>
+          </label>
+        </div>
+
+        <div class="role-card">
+          <div class="role-tag">B</div>
+          <h2>Join</h2>
+          <p>Enter the code your friend gave you.</p>
+          <input id="codeInput" maxlength="6" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" />
+          <button id="joinBtn" class="primary">&gt; Connect</button>
+          <label class="checkbox-row">
+            <input type="checkbox" id="joinForceRelay" checked />
+            <span>Always relay through this server</span>
+          </label>
+        </div>
+      </div>
+      <p id="setupError" class="error hidden"></p>
+      <p class="hint">
+        "Always relay through this server" is checked by default, since a
+        direct connection is commonly blocked by a VPN or firewall — relaying
+        connects reliably every time, through your own DropCode server.
+        Uncheck it on a device to attempt a direct peer-to-peer connection
+        first instead (faster, and this server never sees the data), with an
+        automatic fallback to relaying if that doesn't connect within a few
+        seconds.
+      </p>
+    </section>
+
+    <!-- STEP 2: connected -->
+    <section id="session" class="panel crt-frame hidden">
+      <div id="hostInfo" class="hidden">
+        <div class="hud-label">[ PAIRING CODE ]</div>
+        <div class="code-display" id="codeDisplay">------</div>
+        <button id="copyCodeBtn" class="ghost small">Copy code</button>
+        <div class="link-row">
+          <span class="label">LINK:</span>
+          <code id="linkDisplay"></code>
+          <button id="copyLinkBtn" class="ghost small">Copy link</button>
+        </div>
+        <p class="hint">Anyone with this link and code can join — share it with as many friends as you like.</p>
+      </div>
+
+      <div class="hud-label">[ LINK STATUS ]</div>
+      <div class="status-row">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusText">Waiting for connection...</span>
+        <button id="disconnectBtn" class="ghost small">Disconnect</button>
+      </div>
+
+      <div class="you-row">
+        <span class="label">YOU ARE:</span>
+        <input id="myNameInputSession" maxlength="40" />
+        <button id="renameBtn" class="ghost small">Save name</button>
+      </div>
+
+      <div class="hud-label">[ TARGET SELECT ]</div>
+      <p class="hint">Choose who receives what you send below (defaults to everyone):</p>
+      <div id="deviceList" class="device-list"></div>
+
+      <div class="hud-label">[ PAYLOAD IN ]</div>
+      <div id="dropZone" class="drop-zone">
+        <p><strong>Drag &amp; drop</strong> files or a folder here</p>
+        <p class="or">// OR //</p>
+        <div class="pick-buttons">
+          <button id="pickFilesBtn" class="secondary">Choose files</button>
+          <button id="pickFolderBtn" class="secondary">Choose folder</button>
+        </div>
+        <input type="file" id="fileInput" multiple class="hidden" />
+        <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" />
+      </div>
+
+      <div class="hud-label">[ TEXT UPLINK ]</div>
+      <div class="text-share">
+        <textarea id="textInput" placeholder="TYPE TEXT OR PASTE A LINK TO SEND..." rows="2"></textarea>
+        <button id="sendTextBtn" class="secondary">Send text</button>
+      </div>
+      <div id="textLog" class="text-log"></div>
+
+      <div class="hud-label">[ TRANSFER QUEUE ]</div>
+      <div id="transferList" class="transfer-list"></div>
+    </section>
+
+    <footer>
+      <p>/// Files transfer directly between browsers whenever possible — falling back through this server only when a direct connection can't be made. ///</p>
+      <div class="stamp">
+        <span class="stamp-label">Designed by</span>
+        <span class="stamp-sig">Wahab</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

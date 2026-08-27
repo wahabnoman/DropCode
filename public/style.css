@@ -1,0 +1,564 @@
+/* ============================================================
+   DROPCODE — TACTICAL TELEMETRY INTERFACE
+   Dark CRT terminal system. Monospace throughout. Zero radius.
+   Accent: hazard red. Terminal green reserved for ONE readout —
+   the link-status dot — and nothing else.
+   ============================================================ */
+
+:root {
+  --bg: #0a0a0a;
+  --panel: #0d0d0d;
+  --surface: #000000;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text: #eaeaea;
+  --muted: #8a8a8a;
+  --dim: #4a4a4a;
+  --accent: #ff2a2a;
+  --accent-dim: #4d1414;
+  --good: #4af626; /* status dot ONLY */
+  --font: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-sig: 'Caveat', cursive;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font);
+  font-size: 14px;
+  position: relative;
+}
+
+/* ---------- CRT texture overlays ---------- */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.028) 0px,
+    rgba(255, 255, 255, 0.028) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 998;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- header ---------- */
+.hud-header {
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 20px;
+}
+
+.hud-topline {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: clamp(2.4rem, 9vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.cursor {
+  color: var(--accent);
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+/* ---------- panels ---------- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  padding: 24px 22px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+/* corner marks — the one deliberate structural motif, repeated,
+   not decorated further */
+.crt-frame::before,
+.crt-frame::after {
+  content: '+';
+  position: absolute;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1;
+}
+.crt-frame::before { top: -7px; left: -6px; }
+.crt-frame::after { bottom: -7px; right: -6px; }
+
+.hud-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin: 0 0 16px;
+}
+.hud-label:not(:first-child) { margin-top: 28px; }
+
+/* ---------- typography helpers ---------- */
+label { display: block; }
+
+.name-row label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.name-row input { width: 100%; }
+
+.you-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.you-row .label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.you-row input { flex: 1; min-width: 140px; }
+
+/* ---------- form controls ---------- */
+input[type='text'],
+input:not([type='checkbox']),
+textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 0;
+  padding: 11px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#codeInput {
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- buttons ---------- */
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border-radius: 0;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  padding: 12px 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.08s linear, color 0.08s linear, border-color 0.08s linear;
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+  width: 100%;
+  font-weight: 700;
+}
+.primary:hover { background: var(--text); border-color: var(--text); }
+
+.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.secondary:hover { background: var(--text); color: #0a0a0a; }
+
+.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.ghost:hover { color: var(--text); border-color: var(--border-strong); }
+
+.small { padding: 7px 10px; font-size: 10px; }
+
+.accept-btn { background: var(--text); color: #0a0a0a; border-color: var(--text); font-weight: 700; }
+.accept-btn:hover { background: var(--accent); border-color: var(--accent); color: #0a0a0a; }
+.decline-btn { border-color: var(--accent); color: var(--accent); }
+.decline-btn:hover { background: var(--accent); color: #0a0a0a; }
+
+/* ---------- role cards ---------- */
+.role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-strong);
+  margin-bottom: 4px;
+}
+@media (max-width: 560px) { .role-grid { grid-template-columns: 1fr; } }
+
+.role-card {
+  background: var(--surface);
+  padding: 20px 18px;
+  position: relative;
+}
+.role-tag {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.role-card h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.role-card p { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.checkbox-row input { margin: 0; width: auto; }
+
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  position: relative;
+}
+input[type='checkbox']:checked { background: var(--accent); border-color: var(--accent); }
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: #0a0a0a;
+}
+
+.error {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  margin-top: 12px;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
+  margin: 6px 0 0;
+}
+
+/* ---------- link / code display ---------- */
+.code-display {
+  font-size: clamp(2.2rem, 8vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px 0;
+  margin: 0 0 10px;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+.link-row .label { color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
+.link-row code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  font-size: 11px;
+  word-break: break-all;
+  font-family: var(--font);
+}
+
+/* ---------- status ---------- */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot.connected {
+  background: var(--good);
+  box-shadow: 0 0 8px 1px rgba(74, 246, 38, 0.55);
+}
+
+#statusText {
+  flex: 1;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* ---------- device / target list ---------- */
+.device-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.device-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 8px 12px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+  cursor: pointer;
+}
+.device-pill input { margin: 0; width: auto; }
+
+/* ---------- drop zone ---------- */
+.drop-zone {
+  border: 1px dashed var(--border-strong);
+  padding: 34px 16px;
+  text-align: center;
+  margin-bottom: 4px;
+  position: relative;
+  transition: border-color 0.1s linear, background 0.1s linear;
+}
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  border-style: solid;
+  background: rgba(255, 42, 42, 0.05);
+}
+.drop-zone p {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.drop-zone p strong { color: var(--text); }
+.drop-zone .or { font-size: 9px; letter-spacing: 0.15em; color: var(--dim); }
+
+.pick-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* ---------- text sharing ---------- */
+.text-share {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+.text-share textarea { margin-bottom: 0; resize: vertical; }
+
+.text-log { margin-top: 12px; }
+.text-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--border-strong);
+  padding: 10px 12px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+.text-item .who {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+.text-item pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font);
+}
+
+/* ---------- transfers ---------- */
+.transfer-list { display: flex; flex-direction: column; gap: 8px; }
+
+.transfer-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 11px 12px;
+  font-size: 11px;
+}
+.transfer-item.offer { border-color: var(--accent); }
+.transfer-item.done { border-color: var(--border); opacity: 0.65; }
+
+.transfer-item .meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+.transfer-item .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.transfer-item .from { color: var(--dim); font-weight: 400; }
+.transfer-item .size { color: var(--muted); flex-shrink: 0; font-size: 10px; }
+
+.progress-track {
+  height: 4px;
+  background: var(--border);
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.1s linear;
+}
+.transfer-item.done .progress-fill { background: var(--dim); }
+
+.offer-actions { display: flex; gap: 8px; }
+
+/* ---------- footer ---------- */
+footer {
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  margin-top: 40px;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+/* ---------- signature stamp ----------
+   The one deliberate break from the monospace system (see skill §3.3,
+   textural contrast) — a genuine handwritten signature, treated like a
+   rubber-stamped inspection mark rather than a logo. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 6px 14px 8px;
+  border: 1px solid var(--border-strong);
+  transform: rotate(-2deg);
+  text-transform: none;
+}
+.stamp-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.stamp-sig {
+  font-family: var(--font-sig);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--accent);
+}
