@@ -35,10 +35,27 @@ app.use(express.static('public'));
 // Tells the client the address it should show as the shareable "Link" -
 // NOT window.location.href, which is wrong whenever the host happened to
 // open the page via "localhost" (or any address other than the one a
-// friend on the network can actually reach).
+// friend on the network can actually reach). Also hands over the ICE
+// server list, so adding a TURN server (for networks that block direct
+// WebRTC outright) is a deploy-time env var, not a public/app.js edit.
+const STUN_SERVER = { urls: 'stun:stun.l.google.com:19302' };
+
+function getIceServers() {
+  const servers = [STUN_SERVER];
+  const turnUrls = (process.env.TURN_URLS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (turnUrls.length) {
+    servers.push({
+      urls: turnUrls.length === 1 ? turnUrls[0] : turnUrls,
+      username: process.env.TURN_USERNAME || undefined,
+      credential: process.env.TURN_CREDENTIAL || undefined,
+    });
+  }
+  return servers;
+}
+
 app.get('/api/network-info', (req, res) => {
   const candidates = getAllCandidates();
-  res.json({ address: candidates[0]?.address || null, port: Number(PORT) });
+  res.json({ address: candidates[0]?.address || null, port: Number(PORT), iceServers: getIceServers() });
 });
 
 // code -> { hostClientId, hostSocketId, peers: Map<clientId, socketId>,

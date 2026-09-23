@@ -5,7 +5,10 @@
   const BUFFERED_AMOUNT_LOW_THRESHOLD = 1 * 1024 * 1024; // 1MB
   const BUFFERED_AMOUNT_HIGH_WATERMARK = 8 * 1024 * 1024; // 8MB - pause sending above this
 
-  const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+  // Default until /api/network-info answers; replaced with the server's
+  // configured list (which includes a TURN server if the deploy set
+  // TURN_URLS) as soon as that fetch resolves - see networkInfoPromise.
+  let ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
   // If a direct WebRTC connection hasn't opened within this long, assume
   // something is blocking it (a VPN client or a firewall commonly block
@@ -23,6 +26,13 @@
   // How long to wait for a device to answer "how much of this file do you
   // already have" before just resuming from scratch.
   const RESUME_QUERY_TIMEOUT_MS = 8000;
+  // How long to wait for a recipient to confirm it actually finished
+  // writing a file before treating that leg as needing a retry. A file is
+  // only ever marked "done" once this confirmation arrives - successfully
+  // handing bytes to a data channel or a relay socket only means we tried,
+  // not that anyone received them (a connection can die between the last
+  // chunk and this confirmation, or silently swallow it mid-flight).
+  const ACK_TIMEOUT_MS = 8000;
   // Reconnect backoff cap - retries keep happening but never slower than this.
   const RECONNECT_MAX_DELAY_MS = 15000;
 
@@ -156,6 +166,16 @@
   // "fileId:responderId" -> resolve(receivedBytes|null) - sender side, for
   // the resume handshake (see queryOneResume / the file-resume-ack handler).
   const resumeQueries = new Map();
+  // "fileId:targetId" -> resolve() - sender side, for the delivery
+  // confirmation handshake (see confirmOneDelivery / the file-received handler).
+  const pendingAcks = new Map();
+  // fileId -> size, for a receive that already finished and was cleaned out
+  // of `incoming` - so a resume query arriving late (its own confirmation
+  // got lost, not the file) reports "I have all of it" instead of "unknown",
+  // which would otherwise make the sender redundantly restart the whole
+  // transfer from scratch. Never evicted - a handful of small entries per
+  // session is not worth the bookkeeping to prune.
+  const completedReceives = new Map();
 
   let activeStreams = 0;
   const streamWaiters = [];
@@ -259,21 +279,25 @@
     myNameInputSession.value = currentName();
   }
 
-  // ---------- shareable link ----------
-  // NOT window.location.href: if the host happened to open the page via
-  // "localhost" (or any address other than the one on the LAN), that would
-  // be meaningless to share - a friend's "localhost" means their own
-  // machine, not the host's. Ask the server what address it actually
-  // detected instead (same logic the console printout uses).
+  // ---------- shareable link + ICE server config ----------
+  // Fetched once at startup (not lazily on first host) so a peer's very
+  // first RTCPeerConnection also gets any TURN server the deploy configured,
+  // not just the host's. NOT window.location.href for the link: if the host
+  // happened to open the page via "localhost" (or any address other than
+  // the one on the LAN), that would be meaningless to share - a friend's
+  // "localhost" means their own machine, not the host's.
   let networkInfo = null;
+  const networkInfoPromise = fetch('/api/network-info')
+    .then((r) => r.json())
+    .then((info) => {
+      networkInfo = info;
+      if (Array.isArray(info.iceServers) && info.iceServers.length) ICE_SERVERS = info.iceServers;
+      return info;
+    })
+    .catch(() => (networkInfo = {}));
+
   async function getShareableLink() {
-    if (!networkInfo) {
-      try {
-        networkInfo = await fetch('/api/network-info').then((r) => r.json());
-      } catch (e) {
-        networkInfo = {};
-      }
-    }
+    if (!networkInfo) await networkInfoPromise;
     if (networkInfo.address) {
       return `http://${networkInfo.address}:${networkInfo.port}/`;
     }
@@ -434,9 +458,15 @@
     refreshStatus();
   });
 
-  // One peer left for good (host only): tear down that connection.
+  // A peer's socket disconnected (host only) - a brief blip looks
+  // identical to it leaving for good at this point (unlike the host, a
+  // peer gets no grace window server-side), so keep any in-flight transfer
+  // bookkeeping for it: if it reconnects, 'peer-joined' + ensureConnection
+  // recreate the connection and resumeStalledSends picks the leg back up;
+  // if it really is gone, that leg just never completes, same as an
+  // unanswered accept/decline prompt already does.
   socket.on('peer-left', ({ peerClientId }) => {
-    closeConnection(peerClientId);
+    closeConnection(peerClientId, { keepTransferState: true });
     refreshStatus();
   });
 
@@ -675,6 +705,11 @@
   function closeConnection(clientId, opts = {}) {
     const conn = connections.get(clientId);
     if (!conn) return;
+    // Set *before* deleting from the map: a send loop elsewhere (e.g.
+    // streamBytesFrom) holds this same object by reference, not by looking
+    // it back up, and only checks `conn.ready` - without this it would keep
+    // "successfully" firing sends into a connection that's actually gone.
+    conn.ready = false;
     clearTimeout(conn.fallbackTimer);
     clearTimeout(conn.reconnectTimer);
     try { conn.pc?.close(); } catch (e) {}
@@ -894,15 +929,53 @@
 
     freeSlot(conn, slot);
     if (offset >= record.size) {
-      sendRaw(conn, JSON.stringify({ type: 'file-end', id: fileId, slot }));
-      for (const tid of msgTargets) {
-        const t = record.targets.get(tid);
-        if (t) t.done = true;
+      // Handing this off to the transport is not the same as the recipient
+      // actually having it - a connection can die between this and the
+      // last chunk, or silently drop it in transit. Only mark done once
+      // the recipient confirms (see confirmOneDelivery); if the send
+      // itself already failed, don't even wait for that, go straight to
+      // stalled.
+      if (sendRaw(conn, JSON.stringify({ type: 'file-end', id: fileId, slot }))) {
+        awaitDelivery(fileId, wireClientId, msgTargets);
+      } else {
+        markStalled(fileId, wireClientId, offset, msgTargets);
       }
     } else {
       markStalled(fileId, wireClientId, offset, msgTargets);
     }
     checkTransferComplete(fileId);
+  }
+
+  // Waits for each recipient's "I actually finished writing this" reply
+  // (see finishReceive), independently per target since a fanned-out send
+  // (peer -> host -> several others) can have some targets confirm while
+  // others don't. A target that doesn't confirm in time gets the exact
+  // same "ask what it actually has, then resume from there" treatment as a
+  // genuine mid-transfer disconnect - which also correctly turns into just
+  // a harmless re-send of file-end when the recipient already has
+  // everything and only its own confirmation got lost.
+  function awaitDelivery(fileId, wireClientId, targets) {
+    for (const tid of targets) confirmOneDelivery(fileId, wireClientId, tid);
+  }
+
+  async function confirmOneDelivery(fileId, wireClientId, tid) {
+    const record = outgoing.get(fileId);
+    if (!record) return;
+    const key = fileId + ':' + tid;
+    const confirmed = await new Promise((resolve) => {
+      const timer = setTimeout(() => { pendingAcks.delete(key); resolve(false); }, ACK_TIMEOUT_MS);
+      pendingAcks.set(key, () => { clearTimeout(timer); resolve(true); });
+    });
+    const t = record.targets.get(tid);
+    if (!t) return;
+    if (confirmed) {
+      t.done = true;
+      checkTransferComplete(fileId);
+      return;
+    }
+    markStalled(fileId, wireClientId, record.size, [tid]);
+    t.stalled = false; // retrying right away ourselves - don't also let a reconnect event double-fire this
+    queryResumeAndStream(fileId, wireClientId, [tid]);
   }
 
   function markStalled(fileId, wireClientId, offset, msgTargets) {
@@ -1086,19 +1159,28 @@
     } else if (msg.type === 'file-offer') {
       if (role === 'host') deliverFromHost(msg, fromId);
       if (amITarget(msg)) showOfferPrompt(msg, originId);
-    } else if (msg.type === 'file-accept' || msg.type === 'file-decline' || msg.type === 'file-resume-query' || msg.type === 'file-resume-ack') {
-      // All four are unicast (`to`-addressed) - the host passes through
+    } else if (
+      msg.type === 'file-accept' || msg.type === 'file-decline' ||
+      msg.type === 'file-resume-query' || msg.type === 'file-resume-ack' ||
+      msg.type === 'file-received'
+    ) {
+      // All five are unicast (`to`-addressed) - the host passes through
       // anything not meant for itself, same as accept/decline always did.
       if (role === 'host' && msg.to !== myId()) { relayToOne(msg); return; }
       if (msg.type === 'file-accept' || msg.type === 'file-decline') {
         handleOfferResponse(msg);
       } else if (msg.type === 'file-resume-query') {
         const state = incoming.get(msg.id);
-        sendToOne({ type: 'file-resume-ack', id: msg.id, to: msg.from, from: myId(), received: state ? state.received : -1 });
-      } else {
+        const received = state ? state.received : (completedReceives.has(msg.id) ? completedReceives.get(msg.id) : -1);
+        sendToOne({ type: 'file-resume-ack', id: msg.id, to: msg.from, from: myId(), received });
+      } else if (msg.type === 'file-resume-ack') {
         const key = msg.id + ':' + msg.from;
         const resolve = resumeQueries.get(key);
         if (resolve) { resumeQueries.delete(key); resolve(msg.received); }
+      } else {
+        const key = msg.id + ':' + msg.from;
+        const resolve = pendingAcks.get(key);
+        if (resolve) { pendingAcks.delete(key); resolve(); }
       }
     } else if (msg.type === 'file-start') {
       if (role === 'host') {
@@ -1193,6 +1275,7 @@
       name: msg.name,
       path: msg.path || msg.name,
       size: msg.size,
+      from: originId, // who to confirm delivery back to, once finished
       received: 0,
       chunks: [], // buffered until `writable` is ready, or the full set for a plain Blob download
       writable: null,
@@ -1219,8 +1302,8 @@
       state.row = addTransferRow(state.id, `${state.path} (from ${nameFor(originId)})`, state.size, 'receiving');
     }
 
-    if (window.showDirectoryPicker && state.path.includes('/')) {
-      try {
+    try {
+      if (window.showDirectoryPicker && state.path.includes('/')) {
         if (!saveDirHandle) {
           saveDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         }
@@ -1232,15 +1315,24 @@
         }
         const fileHandle = await dir.getFileHandle(fileName, { create: true });
         state.writable = await fileHandle.createWritable();
-
+      } else if (window.showSaveFilePicker) {
+        // A lone file (not part of a folder drop) gets the same
+        // stream-straight-to-disk treatment via the save-file variant of
+        // the File System Access API - otherwise every single-file transfer
+        // would buffer entirely in memory (see the Blob fallback below),
+        // which is fine for a photo but not for a multi-GB file.
+        const fileHandle = await window.showSaveFilePicker({ suggestedName: state.path });
+        state.writable = await fileHandle.createWritable();
+      }
+      if (state.writable) {
         // Flush anything that arrived while we were waiting for permission.
         for (const buf of state.chunks) await state.writable.write(buf);
         state.chunks = [];
         state.streaming = true;
-      } catch (e) {
-        console.warn('Falling back to per-file download (no folder access):', e);
-        state.writable = null;
       }
+    } catch (e) {
+      console.warn('Falling back to buffered download (no file/folder access):', e);
+      state.writable = null;
     }
   }
 
@@ -1304,7 +1396,11 @@
     }
 
     finishTransferRow(state.row);
+    completedReceives.set(id, state.size);
     incoming.delete(id);
+    // Tell the original sender it can actually mark this done - it doesn't
+    // find out just from having sent the bytes (see confirmOneDelivery).
+    if (state.from) sendToOne({ type: 'file-received', id, to: state.from, from: myId() });
   }
 
   // ---------- transfer list UI ----------
