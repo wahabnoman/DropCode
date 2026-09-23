@@ -3,38 +3,31 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>DropCode // Transfer Terminal</title>
+<title>DropCode</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="scanlines" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-
   <div class="wrap">
-    <header class="hud-header">
-      <div class="hud-topline">// SYS.DROPCODE /// LOCAL-TRANSFER-NODE /// REV 3.0</div>
-      <h1>DROPCODE<span class="cursor">_</span></h1>
-      <p class="tagline">[ PAIR WITH A CODE ] [ TRANSMIT FILES // FOLDERS // TEXT ] [ DIRECT OR RELAYED ]</p>
+    <header class="page-header">
+      <h1>DropCode</h1>
+      <p class="tagline">Pair two devices with a code, then send files, folders, or text — directly between browsers when possible.</p>
     </header>
 
     <!-- STEP 1: choose role -->
-    <section id="setup" class="panel crt-frame">
-      <div class="hud-label">[ 01 // IDENTITY ]</div>
-      <div class="name-row">
+    <section id="setup" class="panel">
+      <div class="field">
         <label for="myNameInput">Your device name</label>
-        <input id="myNameInput" maxlength="40" placeholder="e.g. ALEX'S LAPTOP" autocomplete="off" />
+        <input id="myNameInput" maxlength="40" placeholder="e.g. Alex's laptop" autocomplete="off" />
       </div>
 
-      <div class="hud-label">[ 02 // ESTABLISH LINK ]</div>
       <div class="role-grid">
         <div class="role-card">
-          <div class="role-tag">A</div>
           <h2>Host</h2>
           <p>Generate a code for someone to connect to you.</p>
-          <button id="hostBtn" class="primary">&gt; Start Sharing</button>
+          <button id="hostBtn" class="primary">Start sharing</button>
           <label class="checkbox-row">
             <input type="checkbox" id="hostForceRelay" checked />
             <span>Always relay through this server</span>
@@ -42,11 +35,10 @@
         </div>
 
         <div class="role-card">
-          <div class="role-tag">B</div>
           <h2>Join</h2>
           <p>Enter the code your friend gave you.</p>
           <input id="codeInput" maxlength="6" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" />
-          <button id="joinBtn" class="primary">&gt; Connect</button>
+          <button id="joinBtn" class="primary">Connect</button>
           <label class="checkbox-row">
             <input type="checkbox" id="joinForceRelay" checked />
             <span>Always relay through this server</span>
@@ -66,20 +58,20 @@
     </section>
 
     <!-- STEP 2: connected -->
-    <section id="session" class="panel crt-frame hidden">
+    <section id="session" class="panel hidden">
       <div id="hostInfo" class="hidden">
-        <div class="hud-label">[ PAIRING CODE ]</div>
+        <h3 class="section-label">Pairing code</h3>
         <div class="code-display" id="codeDisplay">------</div>
         <button id="copyCodeBtn" class="ghost small">Copy code</button>
         <div class="link-row">
-          <span class="label">LINK:</span>
+          <span class="label">Link</span>
           <code id="linkDisplay"></code>
           <button id="copyLinkBtn" class="ghost small">Copy link</button>
         </div>
         <p class="hint">Anyone with this link and code can join — share it with as many friends as you like.</p>
       </div>
 
-      <div class="hud-label">[ LINK STATUS ]</div>
+      <h3 class="section-label">Status</h3>
       <div class="status-row">
         <span id="statusDot" class="dot"></span>
         <span id="statusText">Waiting for connection...</span>
@@ -87,19 +79,19 @@
       </div>
 
       <div class="you-row">
-        <span class="label">YOU ARE:</span>
+        <span class="label">You are</span>
         <input id="myNameInputSession" maxlength="40" />
         <button id="renameBtn" class="ghost small">Save name</button>
       </div>
 
-      <div class="hud-label">[ TARGET SELECT ]</div>
+      <h3 class="section-label">Send to</h3>
       <p class="hint">Choose who receives what you send below (defaults to everyone):</p>
       <div id="deviceList" class="device-list"></div>
 
-      <div class="hud-label">[ PAYLOAD IN ]</div>
+      <h3 class="section-label">Files &amp; folders</h3>
       <div id="dropZone" class="drop-zone">
         <p><strong>Drag &amp; drop</strong> files or a folder here</p>
-        <p class="or">// OR //</p>
+        <p class="or">or</p>
         <div class="pick-buttons">
           <button id="pickFilesBtn" class="secondary">Choose files</button>
           <button id="pickFolderBtn" class="secondary">Choose folder</button>
@@ -108,23 +100,20 @@
         <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" />
       </div>
 
-      <div class="hud-label">[ TEXT UPLINK ]</div>
+      <h3 class="section-label">Text</h3>
       <div class="text-share">
-        <textarea id="textInput" placeholder="TYPE TEXT OR PASTE A LINK TO SEND..." rows="2"></textarea>
+        <textarea id="textInput" placeholder="Type text or paste a link to send..." rows="2"></textarea>
         <button id="sendTextBtn" class="secondary">Send text</button>
       </div>
       <div id="textLog" class="text-log"></div>
 
-      <div class="hud-label">[ TRANSFER QUEUE ]</div>
+      <h3 class="section-label">Transfers</h3>
       <div id="transferList" class="transfer-list"></div>
     </section>
 
     <footer>
-      <p>/// Files transfer directly between browsers whenever possible — falling back through this server only when a direct connection can't be made. ///</p>
-      <div class="stamp">
-        <span class="stamp-label">Designed by</span>
-        <span class="stamp-sig">Wahab</span>
-      </div>
+      <p>Files transfer directly between browsers whenever possible, falling back through this server only when a direct connection can't be made.</p>
+      <p class="credit">Designed by Wahab</p>
     </footer>
   </div>
 
