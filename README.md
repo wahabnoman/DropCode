@@ -175,9 +175,11 @@ truth: it knows exactly how many bytes it has, so when data stops arriving
 (or a connection comes back) it asks the sender to continue from that byte.
 Every data frame carries its own byte offset, so a duplicated or skipped
 frame can never be written in the wrong place — the receiver ignores
-anything that doesn't line up and asks again. This works for any
-connection, including a file relayed through the host between two other
-devices.
+anything that doesn't line up and immediately asks the sender to restart
+from the last byte it has. If a direct link dies mid-transfer, the rest
+continues over the server relay while a new direct link is set up in the
+background. This works for any connection, including a file relayed through
+the host between two other devices.
 
 **A file only shows as "done" once the recipient actually confirms it
 finished writing it** — handing the last byte to the network is not the
