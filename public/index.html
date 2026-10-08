@@ -3,121 +3,195 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#050505" />
 <title>DropCode</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ddc97' stroke-width='1.6'%3E%3Ccircle cx='9' cy='12' r='6'/%3E%3Ccircle cx='15' cy='12' r='6'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<script>document.documentElement.classList.add('js');</script>
+<noscript><style>.js .reveal { opacity: 1; transform: none; filter: none; }</style></noscript>
 </head>
 <body>
-  <div class="wrap">
-    <header class="page-header">
-      <h1>DropCode</h1>
-      <p class="tagline">Pair two devices with a code, then send files, folders, or text — directly between browsers when possible.</p>
+  <!-- icon sprite: thin 1.25px line icons -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="3"/><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"/><path d="M14 3v4h4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2H10l2 2.5h6.5a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V5m0 0L8 9m4-4 4 4M5 15v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2L18.5 8"/></symbol>
+  </svg>
+
+  <nav class="island" aria-label="DropCode">
+    <svg class="ico mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>
+    <span class="brand">DropCode</span>
+    <span class="tag"><span class="pulse"></span>Self-hosted</span>
+  </nav>
+
+  <main class="stage">
+    <header class="hero">
+      <span class="eyebrow reveal">Peer-to-peer file transfer</span>
+      <h1 class="reveal" style="--i:1">Pair with a code.<br /><em>Send anything.</em></h1>
+      <p class="tagline reveal" style="--i:2">Pair two devices with a code, then send files, folders, or text — directly between browsers when possible.</p>
+      <ol class="steps reveal" style="--i:3">
+        <li><span>01</span>Host generates a six-letter code</li>
+        <li><span>02</span>Your friend enters it or opens the link</li>
+        <li><span>03</span>Drop files, folders, or text across</li>
+      </ol>
     </header>
 
-    <!-- STEP 1: choose role -->
-    <section id="setup" class="panel">
-      <div class="field">
-        <label for="myNameInput">Your device name</label>
-        <input id="myNameInput" maxlength="40" placeholder="e.g. Alex's laptop" autocomplete="off" />
-      </div>
+    <div class="deck">
+      <!-- STEP 1: choose role -->
+      <section id="setup" class="stack">
+        <div class="bezel reveal"><div class="core">
+          <label class="field-label" for="myNameInput">Your device name</label>
+          <input id="myNameInput" maxlength="40" placeholder="e.g. Alex's laptop" autocomplete="off" />
+        </div></div>
 
-      <div class="role-grid">
-        <div class="role-card">
-          <h2>Host</h2>
-          <p>Generate a code for someone to connect to you.</p>
-          <button id="hostBtn" class="primary">Start sharing</button>
-          <label class="checkbox-row">
-            <input type="checkbox" id="hostForceRelay" checked />
-            <span>Always relay through this server</span>
-          </label>
+        <div class="role-grid">
+          <div class="bezel reveal" style="--i:1"><div class="core role-card">
+            <h2>Host</h2>
+            <p>Generate a code for someone to connect to you.</p>
+            <button id="hostBtn" class="primary"><span>Start sharing</span><span class="btn-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></span></button>
+          </div></div>
+
+          <div class="bezel reveal" style="--i:2"><div class="core role-card">
+            <h2>Join</h2>
+            <p>Enter the code your friend gave you.</p>
+            <input id="codeInput" maxlength="6" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" />
+            <button id="joinBtn" class="primary"><span>Connect</span><span class="btn-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></span></button>
+          </div></div>
         </div>
 
-        <div class="role-card">
-          <h2>Join</h2>
-          <p>Enter the code your friend gave you.</p>
-          <input id="codeInput" maxlength="6" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" />
-          <button id="joinBtn" class="primary">Connect</button>
-          <label class="checkbox-row">
-            <input type="checkbox" id="joinForceRelay" checked />
-            <span>Always relay through this server</span>
-          </label>
-        </div>
-      </div>
-      <p id="setupError" class="error hidden"></p>
-      <p class="hint">
-        "Always relay through this server" is checked by default, since a
-        direct connection is commonly blocked by a VPN or firewall — relaying
-        connects reliably every time, through your own DropCode server.
-        Uncheck it on a device to attempt a direct peer-to-peer connection
-        first instead (faster, and this server never sees the data), with an
-        automatic fallback to relaying if that doesn't connect within a few
-        seconds.
-      </p>
-    </section>
+        <p id="setupError" class="error hidden"></p>
+        <p class="hint reveal" style="--i:3">
+          Devices connect directly to each other whenever the network allows
+          it — fastest, and this server never sees the data. If a VPN or
+          firewall blocks that, DropCode carries on through your own server
+          instead, automatically, and switches to a direct link as soon as one
+          opens up.
+        </p>
+      </section>
 
-    <!-- STEP 2: connected -->
-    <section id="session" class="panel hidden">
-      <div id="hostInfo" class="hidden">
-        <h3 class="section-label">Pairing code</h3>
-        <div class="code-display" id="codeDisplay">------</div>
-        <button id="copyCodeBtn" class="ghost small">Copy code</button>
-        <div class="link-row">
-          <span class="label">Link</span>
-          <code id="linkDisplay"></code>
-          <button id="copyLinkBtn" class="ghost small">Copy link</button>
-        </div>
-        <p class="hint">Anyone with this link and code can join — share it with as many friends as you like.</p>
-      </div>
+      <!-- STEP 2: connected -->
+      <section id="session" class="stack hidden">
+        <div id="hostInfo" class="bezel hidden reveal"><div class="core">
+          <h3 class="section-label">Pairing code</h3>
+          <div class="code-display" id="codeDisplay">------</div>
+          <div class="center">
+            <button id="copyCodeBtn" class="ghost small"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy code</button>
+          </div>
+          <div class="link-row">
+            <span class="label">Link</span>
+            <code id="linkDisplay"></code>
+            <button id="copyLinkBtn" class="ghost small"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy link</button>
+          </div>
+          <p class="hint">Anyone with this link and code can join — share it with as many friends as you like.</p>
+        </div></div>
 
-      <h3 class="section-label">Status</h3>
-      <div class="status-row">
-        <span id="statusDot" class="dot"></span>
-        <span id="statusText">Waiting for connection...</span>
-        <button id="disconnectBtn" class="ghost small">Disconnect</button>
-      </div>
+        <div class="bezel reveal" style="--i:1"><div class="core">
+          <div class="block">
+            <h3 class="section-label">Status</h3>
+            <div class="status-row">
+              <span id="statusDot" class="dot"></span>
+              <span id="statusText">Waiting for connection...</span>
+              <button id="disconnectBtn" class="ghost small">Disconnect</button>
+            </div>
+          </div>
 
-      <div class="you-row">
-        <span class="label">You are</span>
-        <input id="myNameInputSession" maxlength="40" />
-        <button id="renameBtn" class="ghost small">Save name</button>
-      </div>
+          <div class="block">
+            <div class="you-row">
+              <span class="label">You are</span>
+              <input id="myNameInputSession" maxlength="40" />
+              <button id="renameBtn" class="ghost small">Save name</button>
+            </div>
+          </div>
+        </div></div>
 
-      <h3 class="section-label">Send to</h3>
-      <p class="hint">Choose who receives what you send below (defaults to everyone):</p>
-      <div id="deviceList" class="device-list"></div>
+        <div class="bezel reveal" style="--i:2"><div class="core">
+          <div class="block">
+            <div class="label-row">
+              <h3 class="section-label">Send to</h3>
+              <button id="selectAllBtn" class="ghost small hidden">Select none</button>
+            </div>
+            <div id="deviceList" class="device-list"></div>
+            <p id="sendSummary" class="hint"></p>
+          </div>
 
-      <h3 class="section-label">Files &amp; folders</h3>
-      <div id="dropZone" class="drop-zone">
-        <p><strong>Drag &amp; drop</strong> files or a folder here</p>
-        <p class="or">or</p>
-        <div class="pick-buttons">
-          <button id="pickFilesBtn" class="secondary">Choose files</button>
-          <button id="pickFolderBtn" class="secondary">Choose folder</button>
-        </div>
-        <input type="file" id="fileInput" multiple class="hidden" />
-        <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" />
-      </div>
+          <div class="block">
+            <h3 class="section-label">Files &amp; folders</h3>
+            <div id="dropZone" class="drop-zone">
+              <span class="drop-icon"><svg class="ico" aria-hidden="true"><use href="#i-upload"/></svg></span>
+              <p><strong>Drag &amp; drop</strong> files or a folder here</p>
+              <p class="or">or</p>
+              <div class="pick-buttons">
+                <button id="pickFilesBtn" class="secondary"><svg class="ico" aria-hidden="true"><use href="#i-file"/></svg>Choose files</button>
+                <button id="pickFolderBtn" class="secondary"><svg class="ico" aria-hidden="true"><use href="#i-folder"/></svg>Choose folder</button>
+              </div>
+              <input type="file" id="fileInput" multiple class="hidden" />
+              <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" />
+            </div>
+          </div>
 
-      <h3 class="section-label">Text</h3>
-      <div class="text-share">
-        <textarea id="textInput" placeholder="Type text or paste a link to send..." rows="2"></textarea>
-        <button id="sendTextBtn" class="secondary">Send text</button>
-      </div>
-      <div id="textLog" class="text-log"></div>
+          <div class="block">
+            <h3 class="section-label">Text</h3>
+            <div class="text-share">
+              <textarea id="textInput" placeholder="Type text or paste a link — Enter to send, Shift+Enter for a new line" rows="3"></textarea>
+              <button id="sendTextBtn" class="primary inline"><span>Send text</span><span class="btn-icon"><svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></span></button>
+            </div>
+            <div id="textLog" class="text-log"></div>
+          </div>
+        </div></div>
 
-      <h3 class="section-label">Transfers</h3>
-      <div id="transferList" class="transfer-list"></div>
-    </section>
+        <div class="bezel reveal" style="--i:3"><div class="core">
+          <div class="label-row">
+            <h3 class="section-label">Transfers</h3>
+            <button id="clearDoneBtn" class="ghost small hidden">Clear finished</button>
+          </div>
+          <div id="offerBar" class="offer-bar hidden">
+            <span id="offerBarText"></span>
+            <div class="offer-actions">
+              <button id="acceptAllBtn" class="secondary small accept-btn">Accept all</button>
+              <button id="declineAllBtn" class="ghost small decline-btn">Decline all</button>
+            </div>
+          </div>
+          <div id="transferList" class="transfer-list"></div>
+        </div></div>
+      </section>
+    </div>
 
     <footer>
       <p>Files transfer directly between browsers whenever possible, falling back through this server only when a direct connection can't be made.</p>
       <p class="credit">Designed by Wahab</p>
     </footer>
-  </div>
+  </main>
+
+  <!-- Incoming-transfer prompt: one dialog per sender, however many files they sent at once -->
+  <dialog id="offerDialog" class="sheet" aria-labelledby="offerTitle">
+    <div class="bezel"><div class="core">
+      <span class="eyebrow">Incoming transfer</span>
+      <h2 id="offerTitle" class="sheet-title"></h2>
+      <p id="offerSub" class="sheet-sub"></p>
+      <ul id="offerFiles" class="file-list"></ul>
+      <p id="offerNote" class="hint"></p>
+      <div class="sheet-actions">
+        <button id="offerDeclineBtn" class="ghost">Decline</button>
+        <button id="offerAcceptBtn" class="primary inline" autofocus><span>Accept</span><span class="btn-icon"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span></button>
+      </div>
+    </div></div>
+  </dialog>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
+  <script>
+    // Scroll-entry reveals: IntersectionObserver, no scroll listeners.
+    const revealObserver = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('in'); revealObserver.unobserve(e.target); }
+    }), { threshold: 0.05 });
+    document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+  </script>
 </body>
 </html>

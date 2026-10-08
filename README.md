@@ -3,9 +3,10 @@
 Your own AirDrop/PairDrop-style sharing tool: no size limits, no account,
 files go directly between browsers over WebRTC whenever possible. If a
 direct connection can't be made (a VPN or firewall commonly blocks WebRTC
-outright), it automatically falls back to relaying through this server —
-the same tradeoff PairDrop's `WS_FALLBACK` makes, and for the same reason.
-See "If a device won't connect" below.
+outright), it automatically carries on through this server instead — the
+same tradeoff PairDrop's `WS_FALLBACK` makes, and for the same reason — and
+goes back to a direct link whenever one opens. No setting to flip. See
+"Direct first, server relay underneath" below.
 
 ## Requirements
 
@@ -35,30 +36,40 @@ On your network:  http://192.168.1.42:3005   <-- share this link with your frien
    they need to be on the **same Wi-Fi/LAN** as your laptop for this to work
    out of the box.
 3. They open the link, type the code into the **Join** box, click **Connect**.
-4. Once it shows "Connected", either side can drag & drop files or a whole
-   folder, or type text — drop several files or a big folder at once and
-   they all start sending right away instead of waiting in line. The
-   **other device(s)** are listed as checkable pills — leave them all
-   checked to send to everyone, or uncheck the ones you don't want this
-   send to go to. Whoever it's aimed at gets an **Accept / Decline** prompt
-   before anything actually transfers to them.
+4. Once it shows "Connected", pick who you're sending to (see below), then
+   drag & drop files or a whole folder, or type text. Drop several files or
+   a big folder at once and they all start right away instead of waiting in
+   line. Whoever a file is aimed at gets an incoming-transfer prompt and
+   nothing moves until they accept.
 
 The link is "fixed" in the sense that it's always the same address as long
 as your laptop's IP doesn't change — you generate a fresh pairing code each
 time you click "Start Sharing", so old codes can't be reused after you stop
 sharing.
 
+### Choosing who to send to
+
+Every other device in the session appears as a card in the **Send to**
+section — an avatar, its name, and how you're connected to it (Direct or
+Relayed; for a friend's device that isn't the host it says "via host").
+Tap a card to tick or untick it; **Select all / Select none** flips the lot.
+A line underneath always says exactly where your next send will go
+("Sending to everyone (3 devices)", "Sending to 1 of 3 devices").
+
+Nothing is sent to a device you've unticked. If nothing is ticked — or nobody
+else has joined yet — the file picker, drop zone and text box lock and say
+why, rather than quietly sending somewhere you didn't intend.
+
 ### Connecting more than one friend
 
 The same code works for as many devices as you want to invite — just keep
-sharing the same code and link with everyone. Everyone who joins shows up as
-a pill on every other device's screen (host and friends alike), labeled with
-whatever device name they picked. By default a send goes to everyone in the
-session, so it still works as a shared drop for a small group, not just a
-1:1 pairing — but you can uncheck specific pills before sending to reach
-only some of them. If your laptop (the host) closes the page or disconnects,
-the whole session ends for everyone; if one friend leaves, everyone else
-stays connected.
+sharing the same code and link with everyone. Everyone who joins shows up
+as a card on every other device's screen (host and friends alike), labeled
+with whatever device name they picked. By default a send goes to everyone in
+the session, so it works as a shared drop for a small group, not just a 1:1
+pairing — untick cards to reach only some of them. If your laptop (the
+host) closes the page or disconnects, the whole session ends for everyone;
+if one friend leaves, everyone else stays connected.
 
 ### Naming your device
 
@@ -69,11 +80,39 @@ session screen; the new name shows up for everyone immediately.
 
 ### Accepting or declining a transfer
 
-Nobody receives a file, folder, or piece of text without a chance to say no
-first. When something is sent to you (or to a group you're part of), it
-shows up in your Transfers list as a pending offer with **Accept** and
-**Decline** buttons — nothing streams until you click Accept. If you
-decline, the sender sees the item marked "(declined)" and nothing was sent.
+Nobody receives a file or folder without a chance to say no first. When
+something is sent to you, a dialog opens: who it's from, how many files and
+how big, the file names, and a plain note on where it will be saved. **Accept**
+or **Decline** — nothing streams until you accept. A folder or multi-file
+drop arrives as **one** prompt ("Alex wants to send you 120 files · 3.4 GB"),
+not one per file. Text messages arrive straight away without a prompt.
+
+Press Esc or click outside the dialog to decide later: the offers stay in
+your Transfers list with their own Accept / Decline buttons (and an
+**Accept all / Decline all** bar), and while the tab is in the background its
+title shows "(1) Incoming" so you can spot it.
+
+Each transfer row shows who it's going to or from, a live percentage and
+speed, and — for a send to several devices — each device's state
+("Pixel: 45% · iMac: waiting for them to accept"). **Clear finished** tidies
+the list.
+
+### No limits
+
+DropCode puts no cap on what you send or receive: no file-size limit, no
+limit on the number of files in a folder, and no limit on text (long text is
+split into parts and reassembled on the other side). The only practical
+ceilings are your disk space and, for receiving, what your browser can do:
+
+- Where the browser can write straight to disk (Chrome/Edge on `https://` or
+  `localhost`), a received file of any size goes directly to disk as it
+  arrives, so memory use stays flat.
+- On a plain `http://` LAN address browsers hide that capability. DropCode
+  then collects the file in browser-managed storage and downloads it at the
+  end — fine for large files on desktop browsers, which page it out to disk,
+  but you'll want free disk space and the tab left open (the dialog says so
+  for anything over 1 GB). To get streaming-to-disk on a LAN, serve the app
+  over HTTPS or open it via `localhost` on the receiving machine.
 
 ### Sending several things at once
 
@@ -84,32 +123,30 @@ just queues briefly rather than fighting each other for bandwidth). This
 also means a folder full of files doesn't stall behind one big file dropped
 alongside it.
 
-## Relay mode (on by default)
+## Direct first, server relay underneath (automatic)
 
-**"Always relay through this server" is checked by default** on both the
-Host and Join cards. This means every connection routes through your own
-DropCode server rather than attempting a direct peer-to-peer WebRTC link
-first — the default was switched to this after direct WebRTC connections
-proved unreliable across some laptops even on the same Wi-Fi (most often
-because a VPN client or a firewall policy blocks the WebRTC handshake
-outright, which is exactly the mechanism PairDrop's `WS_FALLBACK` exists to
-work around). Relaying connects reliably every time, at the cost of no
-longer being strictly peer-to-peer.
+There's nothing to configure. Every connection first tries a direct
+peer-to-peer WebRTC link. If that hasn't opened within about 2.5 seconds
+(or fails outright — a VPN client or firewall policy blocking the WebRTC
+handshake is the usual cause, and exactly what PairDrop's `WS_FALLBACK`
+exists to work around), the connection carries on through your own
+DropCode server, so it is usable immediately instead of stuck "connecting".
+If a direct link opens later, new traffic switches over to it by itself;
+and if a direct link drops mid-transfer, the transfer continues over the
+relay and DropCode quietly tries to re-establish the direct link in the
+background.
 
-You'll always be able to tell when relay is active: the connection status
-says "(relayed via server)" and the device's chip on the host's screen
-says "(relayed)" — DropCode never silently pretends a relayed connection
-is peer-to-peer.
+You can always tell which path is active: the connection status says
+"(relayed via server)" and the device's chip on the host's screen says
+"· relayed" — DropCode never silently pretends a relayed connection is
+peer-to-peer.
 
-**Important tradeoff:** a relayed connection's data passes through your
-own DropCode server (still just your laptop, not a third party) instead of
-going directly between the two browsers.
+**Tradeoff:** relayed data passes through your own DropCode server (still
+just your laptop, not a third party) instead of going directly between the
+two browsers. The server only passes it along — it stores nothing.
 
-**To try a direct peer-to-peer connection instead** (faster, and this
-server never sees the data), uncheck "Always relay through this server" on
-a device before starting/joining. If a direct connection can't be
-established within about 6 seconds, that one device automatically falls
-back to relaying anyway, so unchecking it never leaves you stuck.
+To reproduce a network that blocks WebRTC, open the page with `?direct=0`
+(it skips the direct attempt entirely and uses the relay).
 
 ## Surviving a page refresh — or a dropped connection
 
@@ -133,14 +170,14 @@ transfer that was in progress keeps going instead of failing outright:
   really does end and everyone is told so.
 
 **A transfer that was in progress when the connection dropped resumes from
-where it left off**, not from scratch — each side asks the other "how much
-of this do you actually have" before continuing, so even an imprecisely-
-timed drop can't duplicate or corrupt bytes. This works for any direct
-connection (host ↔ any device). For a file relayed peer-to-peer through the
-host (a 3+ device group send where neither side is the host), only the
-leg that actually dropped needs to reconnect for the whole thing to keep
-flowing; if you want to be certain a transfer survives a bad connection,
-sending directly from/to the host is the most robust path.
+where it left off**, not from scratch. The *receiver* is the source of
+truth: it knows exactly how many bytes it has, so when data stops arriving
+(or a connection comes back) it asks the sender to continue from that byte.
+Every data frame carries its own byte offset, so a duplicated or skipped
+frame can never be written in the wrong place — the receiver ignores
+anything that doesn't line up and asks again. This works for any
+connection, including a file relayed through the host between two other
+devices.
 
 **A file only shows as "done" once the recipient actually confirms it
 finished writing it** — handing the last byte to the network is not the
@@ -157,16 +194,23 @@ that.
 ## Notes on large files and folders
 
 - If the receiving browser supports the File System Access API (current
-  Chrome/Edge), you'll be asked to pick a save location — a folder for a
-  folder drop, or just where to save for a single file — and bytes stream
-  straight to disk as they arrive. No memory limit either way, including a
-  single very large file.
-- On browsers without that API (Firefox, Safari), a file buffers fully in
-  memory before it downloads — fine for normal file sizes, but a very large
-  single file can use a lot of tab memory on those browsers. Folder drops
+  Chrome/Edge, on `https://` or `localhost`), a folder drop asks you once to
+  pick a destination folder, and any single file of 64 MB or more asks where
+  to save it — those stream straight to disk as they arrive, with no memory
+  limit. Smaller single files just download normally, without a dialog.
+- Everywhere else (Firefox, Safari, or a plain `http://` LAN address, where
+  browsers hide that API) a file is collected in memory and then downloaded.
+  It's folded into browser-managed Blobs as it arrives, which lets the
+  browser page it out to disk, so multi-GB files generally still work — but
+  a very large file can use a lot of memory on those setups. Folder drops
   download individually into your normal Downloads folder, with the folder
   path baked into the filename (e.g. `Photos__2024__trip.jpg`) so nothing is
   lost.
+- When several files are offered at once, an **Accept all / Decline all**
+  bar appears above the transfer list; folder drops only ask for the
+  destination folder once.
+- Closing the tab mid-transfer is the most common way to lose one, so the
+  browser asks for confirmation if you try while something is in flight.
 
 ## Making it work over the internet (not just the same Wi-Fi)
 
@@ -213,19 +257,23 @@ docker run -p 3005:3005 -e TURN_URLS=... -e TURN_USERNAME=... -e TURN_CREDENTIAL
   connection's data never passes through it.
 - `public/app.js` — Every device connects directly to the host over its own
   `RTCPeerConnection` ("star" topology — friends don't connect to each
-  other directly, only to the host). Each connection carries one ordered
-  data channel used for both small JSON control messages (file offers,
-  accept/decline, text) and the raw binary file chunks (16KB at a time,
-  with backpressure handling so large files don't blow up memory) — or,
-  once a connection has fallen back, the same messages sent through the
-  Socket.IO connection instead. Every send names its intended recipient
-  device id(s); when the host receives something meant for someone other
-  than itself, it forwards it on to exactly those devices (over whichever
-  transport each connection is using) instead of blindly broadcasting, so
-  a group of 3+ people can share with each other — or with just one
-  specific person — through one code, even when some of them are relayed.
-  A file/folder transfer always starts with an offer that the recipient(s)
-  must accept before any bytes move.
+  other directly, only to the host), with the Socket.IO relay as a
+  fallback path underneath (see above). Each connection carries one ordered
+  channel used for both small JSON control messages (file offers,
+  accept/decline, acks, text) and binary file frames. Every send names its
+  intended recipient device id(s); when the host receives something meant
+  for someone other than itself, it forwards it on to exactly those
+  devices instead of blindly broadcasting, so a group of 3+ people can
+  share with each other — or with just one specific person — through one
+  code. A file/folder transfer always starts with an offer that the
+  recipient(s) must accept before any bytes move.
+- **Transfer protocol** (modelled on PairDrop's, extended): files go out in
+  64 KB frames, and the receiver acks how much it has safely written every
+  ~512 KB; the sender never has more than 4 MB un-acked in flight. That
+  window applies on both the direct and the relayed path, so a huge file
+  can't pile up in memory on the sender, the server, or the receiver — and
+  the sender's progress bar shows what the receiver confirmed, not what was
+  merely queued. A file counts as complete only at the exact byte count.
 - The server keeps a small roster per room (`room.devices`, id → chosen
   name) and rebroadcasts it whenever someone joins, leaves, or renames —
   that's what powers the device list, naming, and target picker.
@@ -236,17 +284,22 @@ docker run -p 3005:3005 -e TURN_URLS=... -e TURN_USERNAME=... -e TURN_CREDENTIAL
   comes back get recognized as the *same* device — instead of looking like
   a stranger while its old connection quietly times out - and lets a
   transfer resume instead of restarting.
-- Several files can stream over one connection at once: each active
-  transfer claims a small slot number, and every chunk is tagged with it so
-  the receiver (or a relaying host) knows which file it belongs to.
+- Every frame is `[slot][byte offset][payload]`. The slot lets several
+  files stream over one connection at once (and tells a relaying host where
+  to forward it); the offset makes recovery exact — a duplicated or skipped
+  frame is detected and never written in the wrong place. Each stream stays
+  on the path it started on, so switching between direct and relay can't
+  reorder it.
+- Recovery is receiver-driven: the receiver knows exactly how many bytes it
+  has, so when data stops (or a connection comes back) it sends the sender a
+  "continue from byte N" request. The sender keeps no resume state beyond
+  holding the file.
 - A transfer is only marked done on the sender's side once the recipient
   sends back an explicit "I actually finished writing this" confirmation —
-  successfully queuing the last byte into a data channel or a relay socket
-  only means it was attempted, not delivered, and a connection can die in
-  that exact gap. If that confirmation doesn't arrive in a few seconds, the
-  sender re-asks the recipient what it actually has and either resends the
-  missing tail or just the confirmation request again, the same mechanism
-  used for resuming after a reconnect.
+  queuing the last byte into a data channel or a relay socket only means it
+  was attempted, not delivered. If that confirmation is lost the sender
+  keeps asking "did you get it all?" until it's answered; a lost accept,
+  decline or offer is likewise re-sent rather than left waiting forever.
 - Folder drops are read recursively client-side and sent as a flat list of
   files with their relative paths, then reassembled on the other end.
 - The "Link" shown to the host comes from a small `/api/network-info`
@@ -266,24 +319,24 @@ docker run -p 3005:3005 -e TURN_URLS=... -e TURN_USERNAME=... -e TURN_CREDENTIAL
   expiring. Either of those ends any in-flight transfer for good.
 - Reconnect attempts back off but never give up on their own while the tab
   stays open — if a network is down for good, that side just keeps quietly
-  retrying every ~15 seconds. Clicking Disconnect stops it.
-- There's no timeout on an in-flight "how much have you got" resume check
-  either — if the other device is unreachable it just won't resume until it
-  is, same as the accept/decline case below.
+  retrying. Clicking Disconnect stops it. (The direct-link retry is
+  bounded — after a few failed attempts a connection simply stays on the
+  relay.)
 - With several devices connected, the host's browser does the work of
   relaying anything it receives out to everyone else — that's normal
   browser-tab memory/CPU, but very large fan-out to many devices at once
-  will be somewhat limited by the host device's own performance.
-- The relay fallback doesn't apply per-chunk backpressure the way a direct
-  WebRTC data channel does, so a very large transfer over a relayed
-  connection puts more load on the server than the same transfer would
-  peer-to-peer. Fine for normal file/folder sizes; something to be aware of
-  for very large batches on an underpowered host machine.
-- A folder is offered and accepted one file at a time, not as a single
-  bundle — expect an Accept prompt per file inside it.
-- There's no timeout on an accept/decline prompt: if a targeted device
-  never responds (closed tab, etc.), the sender just waits for it. Removing
-  that device from the target list before sending avoids this.
+  will be somewhat limited by the host device's own performance. A file
+  sent from one non-host device to several others is streamed once per
+  recipient, not once in total.
+- Offers and accepts are still per file (a folder is many files), though
+  "Accept all" answers them in one click. An offer to a device that has left
+  the room is dropped after about 20 seconds; one to a device that's merely
+  slow to answer just waits for it.
+- It's a live transfer, not store-and-forward: both devices have to be
+  online together (unlike a service such as AirForShare, which uploads to a
+  server and lets the other side download later).
+- Folder drops download as separate files where the browser can't write
+  into a chosen folder (no zip bundling).
 
 ---
 

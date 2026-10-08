@@ -5,11 +5,13 @@
 //   directly between browsers over a WebRTC data channel (peer-to-peer) -
 //   this server never sees it, and there's no size limit it imposes.
 // - If a direct WebRTC connection can't be established (a VPN or firewall
-//   commonly blocks it outright), the client falls back to relaying that
-//   one connection's data through this server instead (see the 'relay'
-//   handler below) so the transfer still works. That fallback data IS
+//   commonly blocks it outright), the client carries on through this server
+//   instead (see the 'relay' handler below) so the transfer still works,
+//   and goes back to a direct link whenever one opens. That relayed data IS
 //   readable by this server - it's the same tradeoff PairDrop's optional
-//   WS_FALLBACK makes, for the same reason.
+//   WS_FALLBACK makes, for the same reason. The relay is not store-and-
+//   forward: it keeps nothing, and the clients' ack window (see
+//   public/app.js) is what bounds how much sits in this process at once.
 //
 // Identity: every browser tab generates its own stable `clientId` (see
 // public/app.js) that survives a reload AND a bare network reconnect -
@@ -26,7 +28,18 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  // A tab that's busy hashing/writing a big file, or throttled in the
+  // background, can miss a ping for a while. The defaults (25s + 20s) drop
+  // such a tab mid-transfer; a longer timeout rides it out, and the faster
+  // interval still notices a genuinely dead connection reasonably quickly.
+  pingInterval: 15000,
+  pingTimeout: 45000,
+  // Control messages and 64KB data frames are far below this; it's the
+  // ceiling socket.io enforces before it drops a client's connection.
+  maxHttpBufferSize: 1e6,
+  perMessageDeflate: false, // data is already compressed or incompressible - skip the CPU
+});
 
 const PORT = process.env.PORT || 3005;
 
@@ -123,9 +136,24 @@ function safeName(name, fallback) {
   return String(name || '').slice(0, 40) || fallback;
 }
 
+// Client ids end up in the other devices' DOM (the "send to" list), so only
+// accept the plain characters a UUID / the client's fallback id uses.
+function cleanClientId(id) {
+  id = String(id || '');
+  return /^[\w-]{1,100}$/.test(id) ? id : '';
+}
+
+// signal/relay are point-to-point by socket id - only honour a target that
+// is actually in the sender's own room, so knowing (or guessing) another
+// room's socket id doesn't let you inject messages into it.
+function inSameRoom(socket, targetId) {
+  const target = io.sockets.sockets.get(targetId);
+  return !!(target && socket.data.code && target.data.code === socket.data.code);
+}
+
 io.on('connection', (socket) => {
   socket.on('host-start', (clientId, name, cb) => {
-    clientId = String(clientId || '').slice(0, 100);
+    clientId = cleanClientId(clientId);
     if (!clientId) return cb({ error: 'Missing client id.' });
     const code = generateCode();
     const room = { hostClientId: clientId, hostSocketId: socket.id, peers: new Map(), devices: new Map(), graceTimer: null };
@@ -146,9 +174,9 @@ io.on('connection', (socket) => {
   // their current socket ids) so the host can reconnect to each of them.
   socket.on('host-resume', (code, clientId, name, cb) => {
     code = String(code || '').toUpperCase().trim();
-    clientId = String(clientId || '').slice(0, 100);
+    clientId = cleanClientId(clientId);
     const room = rooms.get(code);
-    if (!room || room.hostClientId !== clientId) return cb({ ok: false });
+    if (!room || !clientId || room.hostClientId !== clientId) return cb({ ok: false });
 
     clearTimeout(room.graceTimer);
     room.graceTimer = null;
@@ -170,7 +198,7 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', (code, clientId, name, cb) => {
     code = String(code || '').toUpperCase().trim();
-    clientId = String(clientId || '').slice(0, 100);
+    clientId = cleanClientId(clientId);
     const room = rooms.get(code);
     if (!room) {
       return cb({
@@ -213,18 +241,20 @@ io.on('connection', (socket) => {
   // recipient can match this against its own stable connection bookkeeping
   // even though the sender's socket id may have changed since last time.
   socket.on('signal', (data) => {
-    if (!data || !data.to) return;
+    if (!data || !data.to || !inSameRoom(socket, data.to)) return;
     socket.to(data.to).emit('signal', { ...data, from: socket.id, fromClientId: socket.data.clientId });
   });
 
-  // Fallback relay: used only when a direct WebRTC connection can't be
-  // established (a VPN or firewall commonly blocks the peer-to-peer
-  // handshake outright). In that case file/text data is passed through
-  // here instead - meaning this data IS readable by this server, unlike
-  // a normal WebRTC transfer. See public/app.js for when this kicks in.
+  // Relay: carries file/text data when a direct WebRTC connection isn't up
+  // (a VPN or firewall commonly blocks the peer-to-peer handshake outright)
+  // - meaning this data IS readable by this server, unlike a direct
+  // transfer. Pure pass-through: nothing is stored. Only strings (control
+  // messages) and binary frames are forwarded.
   socket.on('relay', (data) => {
-    if (!data || !data.to) return;
-    socket.to(data.to).emit('relay', { from: socket.id, fromClientId: socket.data.clientId, payload: data.payload });
+    if (!data || !data.to || !inSameRoom(socket, data.to)) return;
+    const p = data.payload;
+    if (typeof p !== 'string' && !Buffer.isBuffer(p)) return;
+    socket.to(data.to).emit('relay', { from: socket.id, fromClientId: socket.data.clientId, payload: p });
   });
 
   socket.on('disconnect', () => {
